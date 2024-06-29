@@ -1,0 +1,98 @@
+post_install() {
+
+  echo ">>> Initialise ZTNET with the following steps:"
+  echo ""
+  echo "    1. Initialise the PostgreSQL database cluster:"
+  echo "       $ sudo -u postgres TZ=UTC initdb --locale=C.UTF-8 --encoding=UTF8 -D /var/lib/postgres/data"
+  echo ""
+  echo "    2. Enable and start the PostgreSQL unit:"
+  echo "       $ sudo systemctl enable --now postgresql"
+  echo ""
+  echo "    3. Create a PostgreSQL user:"
+  echo "       NOTE: Replace '\$POSTGRES_USER' and '\$POSTGRES_PASSWORD' with your desired credentials."
+  echo "       $ sudo -u postgres psql -c \"CREATE USER \$POSTGRES_USER WITH PASSWORD '\$POSTGRES_PASSWORD';\""
+  echo ""
+  echo "    4. Create a database for ZTNET:"
+  echo "       NOTE: Replace '\$POSTGRES_DB' with your desired credential."
+  echo "       $ sudo -u postgres psql -c \"CREATE DATABASE \$POSTGRES_DB;\""
+  echo ""
+  echo "    5. Grant all privileges to '\$POSTGRES_USER' on ZTNET database '\$POSTGRES_DB':"
+  echo "       $ sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE \$POSTGRES_DB TO \$POSTGRES_USER;\""
+  echo ""
+  echo "    6. Grant all privileges to '\$POSTGRES_USER' on ZTNET database '\$POSTGRES_DB' public schema:"
+  echo "       sudo -u postgres psql -d \"\$POSTGRES_DB\" -c \"GRANT ALL PRIVILEGES ON SCHEMA public TO '\$POSTGRES_USER';\""
+  echo ""
+  echo "    7. Adjust ZTNET service to reflect your credentials:"
+  echo "       NOTE: Populate '\$POSTGRES_USER' '\$POSTGRES_PASSWORD' '\$POSTGRES_DB with your desired credentials."
+  echo "       NOTE: Set '\$NEXTAUTH_URL' to the canonical URL or IP of your site with port 3000."
+  echo "       $ sudo systemctl edit ztnet"
+  echo ""
+  echo "       NOTE: Append the following entries to the drop-in file with your desired values."
+  echo "       [Service]"
+  echo "       Environment=POSTGRES_USER="
+  echo "       Environment=POSTGRES_PASSWORD="
+  echo "       Environment=POSTGRES_DB="
+  echo "       Environment=NEXTAUTH_URL="http://127.0.0.1:3000""
+  echo ""
+  echo "    8. Enable and start the ZeroTier unit:"
+  echo "       $ sudo systemctl enable --now zerotier-one"
+  echo ""
+  echo "    9. Enable and start the ZTNET unit:"
+  echo "       $ sudo systemctl enable --now ztnet"
+  echo ""
+  echo ">> ZTNET will be avaliable on the \$NEXTAUTH_URL address on port 3000, e.g http://127.0.0.1:3000."
+  echo ">> More environment variables can be found on https://ztnet.network/installation/options and set in the ztnet systemd unit."
+  echo ""
+
+  # Ensure that ztnet installation directory is owned by zerotier-one
+  chown -R zerotier-one:zerotier-one /opt/sinamics/
+
+}
+
+pre_upgrade() {
+  [ $(systemctl is-active ztnet) = active ] && {
+    systemctl stop --now ztnet
+  }
+
+}
+
+post_upgrade() {
+  [ $(systemctl is-active ztnet) = inactive ] && {
+    systemctl start --now ztnet
+  }
+
+  # Ensure that ztnet installation directory is owned by zerotier-one
+  chown -R zerotier-one:zerotier-one /opt/sinamics/ztnet
+
+  # Reload systemd daemon
+  systemctl daemon-reload
+
+}
+
+pre_remove() {
+  [ $(systemctl is-active ztnet) = active ] && {
+    systemctl disable --now ztnet
+  }
+
+  # Remove the drop-in systemd folder if it exists
+  [ -d /etc/systemd/system/ztnet.service.d ] && rm -r /etc/systemd/system/ztnet.service.d
+
+  # Reload systemd daemon
+  systemctl daemon-reload
+
+}
+
+post_remove() {
+  # Remove the ZTNET folder if it exists
+  [ -d /opt/sinamics/ztnet ] && rm -r /opt/sinamics/ztnet
+
+  # Remove 'sinamics' folder if it exists and is empty
+  [ -d /opt/sinamics ] && [ -z "$(ls -A /opt/sinamics)" ] && rm -r /opt/sinamics
+
+  echo ">>> ZTNET has been uninstalled."
+  echo ""
+  echo "    NOTE: The PostgreSQL database must be removed manually. Replace '\$POSTGRES_DB' with the database name.:"
+  echo "       $ sudo -u postgres dropdb '\$POSTGRES_DB' -f"
+  echo ""
+
+}

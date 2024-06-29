@@ -1,0 +1,37 @@
+[Unit]
+Description=ZTNET - ZeroTier Web UI
+Requires=network.target zerotier-one.service
+After=network.target zerotier-one.service
+
+[Service]
+# PostgreSQL
+Environment=POSTGRES_USER=
+Environment=POSTGRES_PASSWORD=
+Environment=POSTGRES_DB=
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+
+# Next.js
+Environment=NEXTAUTH_URL=http://127.0.0.1:3000
+Environment=NEXT_PUBLIC_SITE_NAME=ZTNET
+Environment=NEXT_PUBLIC_APP_VERSION=
+Environment=NEXT_TELEMETRY_DISABLED=1
+
+# ZeroTier
+Environment=ZT_ADDR=http://127.0.0.1:9993
+
+# Node.js
+Environment=NODE_ENV=production
+
+# ZTNET *MUST* run under ZeroTier user to work properly.
+User=zerotier-one
+Group=zerotier-one
+WorkingDirectory=/opt/sinamics/ztnet
+
+# Start ZTNET
+ExecStart=/usr/bin/bash -c './env_setup.sh /usr/bin/node server.js'
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
